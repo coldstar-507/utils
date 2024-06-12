@@ -49,14 +49,36 @@ func Backward[E any](s []E) func(func(int, E) bool) {
 	}
 }
 
-func MakeMongoId(username string) [12]byte {
+func MakeMongoIds(usernames []string) []string {
+	return Map(usernames, func(username string) string {
+		return MakeMongoId(username)
+	})
+}
+
+func MakeRawMongoIds(usernames []string) [][12]byte {
+	return Map(usernames, func(username string) [12]byte {
+		return MakeRawMongoId(username)
+	})
+}
+
+func MakeMongoObjectIds(usernames []string) []primitive.ObjectID {
+	return Map(usernames, func(username string) primitive.ObjectID {
+		return MakeMongoObjectId(username)
+	})
+}
+
+func MakeMongoId(username string) string {
+	return MakeMongoObjectId(username).Hex()
+}
+
+func MakeRawMongoId(username string) [12]byte {
 	buf := [12]byte{}
 	hash := sha1.New().Sum([]byte(username))
 	copy(buf[:], hash)
 	return buf
 }
 
-func MakeMongoId_(username string) primitive.ObjectID {
+func MakeMongoObjectId(username string) primitive.ObjectID {
 	buf := [12]byte{}
 	hash := sha1.New().Sum([]byte(username))
 	copy(buf[:], hash)
