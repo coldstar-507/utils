@@ -16,6 +16,35 @@ import (
 	"time"
 )
 
+func StatusLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Serve HTTP request
+		lw := &loggingResponseWriter{w, http.StatusOK} // Initialize custom response writer
+		next.ServeHTTP(lw, r)
+
+		// Log status code
+		log.Printf("[%s] %s %s %d\n", r.Method, r.URL.Path, r.RemoteAddr, lw.statusCode)
+	})
+}
+
+// Custom response writer to intercept status code
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (lrw *loggingResponseWriter) WriteHeader(code int) {
+	lrw.statusCode = code
+	lrw.ResponseWriter.WriteHeader(code)
+}
+
+func (lrw *loggingResponseWriter) Flush() {
+	flusher, ok := lrw.ResponseWriter.(http.Flusher)
+	if ok {
+		flusher.Flush()
+	}
+}
+
 func HttpLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Incoming request: %s %s", r.Method, r.URL.Path)
