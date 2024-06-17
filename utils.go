@@ -16,6 +16,12 @@ import (
 	"time"
 )
 
+func ApplyMiddlewares(server http.Handler, handlers ...func(http.Handler) http.Handler) {
+	for _, h := range handlers {
+		server = h(server)
+	}
+}
+
 func StatusLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Serve HTTP request
