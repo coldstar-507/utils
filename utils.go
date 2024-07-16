@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"bytes"
+	// "bytes"
 	"crypto/rand"
 	// "crypto/sha1"
 	"fmt"
