@@ -1,26 +1,70 @@
 package utils
 
 import (
+	"bytes"
 	"crypto/rand"
-	"crypto/sha1"
+	// "crypto/sha1"
 	"fmt"
 	"net/http"
 	"strconv"
+	"unsafe"
 
 	"log"
 
 	"github.com/btcsuite/btcd/btcutil/base58"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	// "go.mongodb.org/mongo-driver/bson/primitive"
 
 	"strings"
 	"time"
 )
+
+func FastBytesToString(b []byte) string {
+	return unsafe.String(unsafe.SliceData(b), len(b))
+}
+
+func FastStringToBytes(s string) []byte {
+	return unsafe.Slice(unsafe.StringData(s), len(s))
+}
+
+func ExtractMediaPlace(mediaId string) string {
+	i, j := NthIndexOf(2, '-', mediaId), NthIndexOf(3, '-', mediaId)
+	return mediaId[i+1 : j]
+}
+
+func NthIndexOf(n int, c byte, s string) int {
+	var ix int
+	for ix = strings.IndexByte(s, c); ix > 0; ix = strings.IndexByte(s[ix+1:], c) {
+		if n--; n > 0 {
+			return ix
+		}
+	}
+	return ix
+}
 
 func ApplyMiddlewares(server http.Handler, handlers ...func(http.Handler) http.Handler) http.Handler {
 	for _, h := range handlers {
 		server = h(server)
 	}
 	return server
+}
+
+func AddToSet[T comparable](elem T, set []T) ([]T, bool) {
+	if Contains(elem, set) {
+		return set, false
+	} else {
+		return append(set, elem), true
+	}
+}
+
+func AddAllToSet[T comparable](set []T, elems ...T) []T {
+	for _, elem := range elems {
+		if Contains(elem, set) {
+			continue
+		} else {
+			set = append(set, elem)
+		}
+	}
+	return set
 }
 
 func StatusLogger(next http.Handler) http.Handler {
@@ -93,41 +137,41 @@ func Backward[E any](s []E) func(func(int, E) bool) {
 	}
 }
 
-func MakeMongoIds(usernames []string) []string {
-	return Map(usernames, func(username string) string {
-		return MakeMongoId(username)
-	})
-}
+// func MakeMongoIds(usernames []string) []string {
+// 	return Map(usernames, func(username string) string {
+// 		return MakeMongoId(username)
+// 	})
+// }
 
-func MakeRawMongoIds(usernames []string) [][12]byte {
-	return Map(usernames, func(username string) [12]byte {
-		return MakeRawMongoId(username)
-	})
-}
+// func MakeRawMongoIds(usernames []string) [][12]byte {
+// 	return Map(usernames, func(username string) [12]byte {
+// 		return MakeRawMongoId(username)
+// 	})
+// }
 
-func MakeMongoObjectIds(usernames []string) []primitive.ObjectID {
-	return Map(usernames, func(username string) primitive.ObjectID {
-		return MakeMongoObjectId(username)
-	})
-}
+// func MakeMongoObjectIds(usernames []string) []primitive.ObjectID {
+// 	return Map(usernames, func(username string) primitive.ObjectID {
+// 		return MakeMongoObjectId(username)
+// 	})
+// }
 
-func MakeMongoId(username string) string {
-	return MakeMongoObjectId(username).Hex()
-}
+// func MakeMongoId(username string) string {
+// 	return MakeMongoObjectId(username).Hex()
+// }
 
-func MakeRawMongoId(username string) [12]byte {
-	buf := [12]byte{}
-	hash := sha1.New().Sum([]byte(username))
-	copy(buf[:], hash)
-	return buf
-}
+// func MakeRawMongoId(username string) [12]byte {
+// 	buf := [12]byte{}
+// 	hash := sha1.New().Sum([]byte(username))
+// 	copy(buf[:], hash)
+// 	return buf
+// }
 
-func MakeMongoObjectId(username string) primitive.ObjectID {
-	buf := [12]byte{}
-	hash := sha1.New().Sum([]byte(username))
-	copy(buf[:], hash)
-	return primitive.ObjectID(buf)
-}
+// func MakeMongoObjectId(username string) primitive.ObjectID {
+// 	buf := [12]byte{}
+// 	hash := sha1.New().Sum([]byte(username))
+// 	copy(buf[:], hash)
+// 	return primitive.ObjectID(buf)
+// }
 
 func MakeChatNumUnik(chatNum int) string {
 	// a 13 max length, we have max num of 9,999,999,999,999
@@ -153,6 +197,10 @@ func MakeTimeId() string {
 
 func MakeTimestamp() int64 {
 	return time.Now().UnixMilli()
+}
+
+func MakeTimestampStr() string {
+	return strconv.Itoa(int(time.Now().UnixMilli()))
 }
 
 func UnixMilli() int64 {
