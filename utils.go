@@ -3,45 +3,81 @@ package utils
 import (
 	// "bytes"
 	"crypto/rand"
+	"encoding/json"
+	"strings"
+
 	// "crypto/sha1"
 	"fmt"
 	"net/http"
 	"strconv"
-	"unsafe"
+
+	// "unsafe"
 
 	"log"
 
 	"github.com/btcsuite/btcd/btcutil/base58"
+	"go.mongodb.org/mongo-driver/bson"
+
 	// "go.mongodb.org/mongo-driver/bson/primitive"
 
-	"strings"
 	"time"
 )
 
-func FastBytesToString(b []byte) string {
-	return unsafe.String(unsafe.SliceData(b), len(b))
-}
-
-func FastStringToBytes(s string) []byte {
-	return unsafe.Slice(unsafe.StringData(s), len(s))
-}
-
-func ExtractMediaPlace(mediaId string) string {
-	i, j := NthIndexOf(2, '-', mediaId), NthIndexOf(3, '-', mediaId)
-	return mediaId[i+1 : j]
-}
-
-func NthIndexOf(n int, c byte, s string) int {
-	var ix int
-	for ix = strings.IndexByte(s, c); ix > 0; ix = strings.IndexByte(s[ix+1:], c) {
-		if n--; n > 0 {
-			return ix
+// returns -1 if not found
+func FirstIndexOf[T comparable](e T, l []T) int {
+	for i, x := range l {
+		if x == e {
+			return i
 		}
 	}
-	return ix
+	return -1
 }
 
-func ApplyMiddlewares(server http.Handler, handlers ...func(http.Handler) http.Handler) http.Handler {
+func SprettyPrint(a any) string {
+	switch a.(type) {
+	case []byte:
+		var m map[string]interface{}
+		bson.Unmarshal(a.([]byte), &m)
+		return SprettyPrint(m)
+	case map[string]interface{}, []interface{}, []map[string]interface{}:
+		s, _ := json.MarshalIndent(a, "", "    ")
+		return string(s)
+
+	}
+	panic(fmt.Sprintf("PrettyPrint invalid param type: %T", a))
+}
+
+// func FastBytesToString(b []byte) string {
+// 	return unsafe.String(unsafe.SliceData(b), len(b))
+// }
+
+// func FastStringToBytes(s string) []byte {
+// 	return unsafe.Slice(unsafe.StringData(s), len(s))
+// }
+
+// func ExtractMediaPlace(mediaId string) string {
+// 	i, j := NthIndexOf(2, '-', mediaId), NthIndexOf(3, '-', mediaId)
+// 	return mediaId[i+1 : j]
+// }
+
+// func NthIndexOf(n int, c byte, s string) int {
+// 	var ix int
+// 	for ix = strings.IndexByte(s, c); ix > 0; ix = strings.IndexByte(s[ix+1:], c) {
+// 		if n--; n > 0 {
+// 			return ix
+// 		}
+// 	}
+// 	return ix
+// }
+
+func Assert(cond bool, message string, args ...any) {
+	if !cond {
+		panic(fmt.Sprintf(message, args))
+	}
+}
+
+func ApplyMiddlewares(server http.Handler,
+	handlers ...func(http.Handler) http.Handler) http.Handler {
 	for _, h := range handlers {
 		server = h(server)
 	}
@@ -69,12 +105,13 @@ func AddAllToSet[T comparable](set []T, elems ...T) []T {
 
 func StatusLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t1 := time.Now()
 		// Serve HTTP request
 		lw := &loggingResponseWriter{w, http.StatusOK} // Initialize custom response writer
 		next.ServeHTTP(lw, r)
-
 		// Log status code
-		log.Printf("[%s] %s %s %d\n", r.Method, r.URL.Path, r.RemoteAddr, lw.statusCode)
+		t2 := time.Now()
+		log.Printf("[%s] %s %s %d %dms\n", r.Method, r.URL.Path, r.RemoteAddr, lw.statusCode, t2.Sub(t1).Milliseconds())
 	})
 }
 
@@ -324,6 +361,14 @@ func Contains[T comparable](e T, a []T) bool {
 		}
 	}
 	return false
+}
+
+func Remove[T comparable](e T, l []T) ([]T, bool) {
+	i := FirstIndexOf(e, l)
+	if i == -1 {
+		return l, false
+	}
+	return append(l[:i], l[i+1:]...), true
 }
 
 func ContainsWhere[T any, K any](e T, a []K, f func(T, K) bool) bool {
