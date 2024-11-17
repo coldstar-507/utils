@@ -1,0 +1,4 @@
+github.com/coldstar-507/flatgen v0.0.0-20240830172816-703a5c6098f5 h1:gc2xBRkGTkDeOJRrHRpHkJPJGeSpxiyk6NCvi1T8xFw=
+github.com/coldstar-507/flatgen v0.0.0-20240830172816-703a5c6098f5/go.mod h1:JaYjlenuzWZYYiLk0/RqG9/XbWDtvVWsMWS0yZ4T9w8=
+github.com/google/flatbuffers v24.3.25+incompatible h1:CX395cjN9Kke9mmalRoL3d81AtFUxJM+yDthflgJGkI=
+github.com/google/flatbuffers v24.3.25+incompatible/go.mod h1:1AeVuKshWv4vARoZatz6mlQ0JxURH0Kv5+zNeJKJCa8=

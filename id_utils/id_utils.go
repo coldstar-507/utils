@@ -1,11 +1,9 @@
-package utils
+package id_utils
 
 import (
 	"bytes"
 	"crypto/rand"
 	"encoding/binary"
-
-	// "encoding/hex"
 
 	"github.com/coldstar-507/flatgen"
 )
