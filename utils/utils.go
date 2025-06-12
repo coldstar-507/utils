@@ -2,7 +2,11 @@ package utils
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
+	"io"
+	"net"
+	"sync"
 
 	"fmt"
 	"strconv"
@@ -13,6 +17,85 @@ import (
 
 	"time"
 )
+
+func Lln(header string) func(...any) {
+	return func(k ...any) {
+		args := append([]any{header}, k...)
+		log.Println(args...)
+	}
+}
+
+func Lf(header string) func(string, ...any) {
+	return func(msg string, k ...any) {
+		log.Printf(header+msg, k...)
+	}
+}
+
+func Pln(header string) func(...any) {
+	return func(k ...any) {
+		args := append([]any{header}, k...)
+		fmt.Println(args...)
+	}
+}
+
+func Pf(header string) func(string, ...any) {
+	return func(msg string, k ...any) {
+		fmt.Printf(header+msg, k...)
+	}
+}
+
+func If[T any](t bool, a, b T) T {
+	if t {
+		return a
+	} else {
+		return b
+	}
+}
+
+type Binw interface {
+	WriteBin(...any) error
+}
+
+type ClientConn struct {
+	C net.Conn
+	m sync.Mutex
+}
+
+func NewLockedConn(conn net.Conn) *ClientConn {
+	return &ClientConn{C: conn, m: sync.Mutex{}}
+}
+
+func (cc *ClientConn) WriteBin(vals ...any) error {
+	cc.m.Lock()
+	defer cc.m.Unlock()
+	return WriteBin(cc.C, vals...)
+}
+
+func (cc *ClientConn) Locked(f func(w io.Writer)) {
+	cc.m.Lock()
+	f(cc.C)
+	cc.m.Unlock()
+}
+
+func ReadBin(r io.Reader, b ...any) error {
+	var err error
+	for _, x := range b {
+		if err = binary.Read(r, binary.BigEndian, x); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func WriteBin(w io.Writer, b ...any) error {
+	var err error
+	for _, x := range b {
+		if err = binary.Write(w, binary.BigEndian, x); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // returns -1 if not found
 func FirstIndexOf[T comparable](e T, l []T) int {
@@ -33,7 +116,6 @@ func SprettyPrint(e any) string {
 	case map[string]interface{}, []interface{}, []map[string]interface{}, interface{}:
 		s, _ := json.MarshalIndent(a, "", "    ")
 		return string(s)
-
 
 	}
 	panic(fmt.Sprintf("SprettyPrint invalid param type: %T", e))
@@ -70,10 +152,13 @@ func Must(err error) {
 	}
 }
 
-func Panic(err error, errMsg string) {
-	if err != nil {
-		panic(fmt.Sprintf(errMsg+": %v\n", err))
+func Panic(err error, errMsg string, args ...any) {
+	if err == nil {
+		return
 	}
+	argStr := fmt.Sprintf(errMsg, args...)
+	panicStr := fmt.Sprintf("%s: %v", argStr, err)
+	panic(panicStr)
 }
 
 func Fatal(err error, errMsg string) {
@@ -98,66 +183,14 @@ func Backward[E any](s []E) func(func(int, E) bool) {
 	}
 }
 
-// func MakeMongoIds(usernames []string) []string {
-// 	return Map(usernames, func(username string) string {
-// 		return MakeMongoId(username)
-// 	})
-// }
-
-// func MakeRawMongoIds(usernames []string) [][12]byte {
-// 	return Map(usernames, func(username string) [12]byte {
-// 		return MakeRawMongoId(username)
-// 	})
-// }
-
-// func MakeMongoObjectIds(usernames []string) []primitive.ObjectID {
-// 	return Map(usernames, func(username string) primitive.ObjectID {
-// 		return MakeMongoObjectId(username)
-// 	})
-// }
-
-// func MakeMongoId(username string) string {
-// 	return MakeMongoObjectId(username).Hex()
-// }
-
-// func MakeRawMongoId(username string) [12]byte {
-// 	buf := [12]byte{}
-// 	hash := sha1.New().Sum([]byte(username))
-// 	copy(buf[:], hash)
-// 	return buf
-// }
-
-// func MakeMongoObjectId(username string) primitive.ObjectID {
-// 	buf := [12]byte{}
-// 	hash := sha1.New().Sum([]byte(username))
-// 	copy(buf[:], hash)
-// 	return primitive.ObjectID(buf)
-// }
-
-// func MakeChatNumUnik(chatNum int) string {
-// 	// a 13 max length, we have max num of 9,999,999,999,999
-// 	// which is 9 trillion+ max chats for a single root
-// 	u := strconv.FormatUint(uint64(chatNum), 10) // base16 (hex)
-// 	padLen := 13 - len(u)
-// 	return strings.Repeat("0", padLen) + u
-// }
-
-// func RandomUnik() string {
-// 	s := base58.Encode(RandomBytes(20))
-// 	s_ := strings.Clone(s[:15])
-// 	if len(s_) != 15 {
-// 		panic("length of random unik string isn't 15")
-// 	}
-// 	return s_
-// }
-
-// func MakeTimeId() string {
-// 	// TODO: implement timeId
-// 	panic("IMPLEMENT TIMEID")
-// }
-
 func MakeTimestamp() int64 {
 	return time.Now().UnixMilli()
+}
+
+func MakeNonce() uint32 {
+	b := make([]byte, 4)
+	rand.Read(b)
+	return binary.BigEndian.Uint32(b)
 }
 
 func MakeTimestampStr() string {
@@ -212,13 +245,12 @@ func MaxKey[T comparable](m map[T]int) string {
 			return a
 		}
 	}
-
 	maxReg := MapReduce(m, [2]interface{}{"", 0}, mr)[0].(string)
 	return maxReg
 }
 
 func RandomBytes(n int) []byte {
-	buf := make([]byte, 0, n)
+	buf := make([]byte, n)
 	if _, err := rand.Read(buf); err != nil {
 		panic(err)
 	}
@@ -322,4 +354,13 @@ func Filter[T any](l []T, t func(e T) bool) []T {
 		}
 	}
 	return f
+}
+
+func SplitMap[T any](a []T, t func(a T) uint32) map[uint32][]T {
+	m := make(map[uint32][]T)
+	for _, v := range a {
+		i := t(v)
+		m[i] = append(m[i], v)
+	}
+	return m
 }
