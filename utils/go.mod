@@ -1,4 +1,4 @@
-module coldstar-507/utils/utils
+module github.com/coldstar-507/utils/utils
 
 go 1.23.2
 
